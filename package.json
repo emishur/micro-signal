@@ -1,0 +1,16 @@
+{
+  "name": "micro-signal",
+  "version": "0.0.1",
+  "type": "module",
+  "packageManager": "yarn@1.22.22",
+  "scripts": {
+    "dev": "yarn tsx src/index.ts",
+    "build": "tsc -b"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.30",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3"
+  },
+  "dependencies": {}
+}
