@@ -1,3 +1,3 @@
 # micro-signal
 
-Proof-of concept Signal implementation.
+Proof-of-concept Signals implementation.
