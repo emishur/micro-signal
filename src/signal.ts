@@ -1,5 +1,6 @@
 type Observer = () => void;
 const callstack: Observer[] = [];
+const pendingEffects = new Set<Observer>();
 
 const createObservable = () => {
   const dependents = new Set<Observer>();
@@ -9,7 +10,7 @@ const createObservable = () => {
   };
   const invalidateDependents = () => {
     dependents.forEach((d) => d());
-    dependents.clear;
+    dependents.clear();
   };
   return {
     addCallerAsDependent,
@@ -30,6 +31,8 @@ export const signal = <T>(value: NonVoid<T>): [Getter<T>, Setter<T>] => {
   const setter = (newValue: NonVoid<T>) => {
     value = newValue;
     observable.invalidateDependents();
+    pendingEffects.forEach((eff) => eff());
+    pendingEffects.clear();
   };
   return [getter, setter];
 };
@@ -61,4 +64,27 @@ export const calculated = <T>(fn: () => NonVoid<T>): Getter<T> => {
     }
   };
   return getter;
+};
+
+/**
+ * @return detach function
+ */
+export const effect = (eff: () => void): (() => void) => {
+  let detached = false;
+  const invalidate = () => {
+    if (!detached) pendingEffects.add(effect);
+  };
+  const effect = () => {
+    if (detached) return;
+    callstack.push(invalidate);
+    try {
+      eff();
+    } finally {
+      callstack.pop();
+    }
+  };
+  effect();
+  return () => {
+    detached = true;
+  };
 };

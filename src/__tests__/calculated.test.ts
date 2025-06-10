@@ -59,4 +59,14 @@ describe("calculated values", () => {
     expect(calc1).toBeCalledTimes(1);
     expect(calc2).toBeCalledTimes(1);
   });
+  it("branching", () => {
+    const [condition, setCondition] = signal(true);
+    const [one] = signal(1);
+    const [two] = signal(2);
+    const calc = calculated(() => (condition() ? one() : two()));
+
+    expect(calc()).toEqual(1);
+    setCondition(false);
+    expect(calc()).toEqual(2);
+  });
 });
