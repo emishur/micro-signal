@@ -1,6 +1,7 @@
 type Observer = () => void;
 const callstack: Observer[] = [];
 const pendingEffects = new Set<Observer>();
+let batchLevel = 0;
 
 const createObservable = () => {
   const dependents = new Set<Observer>();
@@ -18,6 +19,11 @@ const createObservable = () => {
   };
 };
 
+const runPendingEffects = () => {
+  pendingEffects.forEach((eff) => eff());
+  pendingEffects.clear();
+};
+
 export type NonVoid<T> = T extends void ? never : T;
 export type Getter<T> = () => NonVoid<T>;
 export type Setter<T> = (value: NonVoid<T>) => void;
@@ -31,8 +37,7 @@ export const signal = <T>(value: NonVoid<T>): [Getter<T>, Setter<T>] => {
   const setter = (newValue: NonVoid<T>) => {
     value = newValue;
     observable.invalidateDependents();
-    pendingEffects.forEach((eff) => eff());
-    pendingEffects.clear();
+    if (batchLevel === 0) runPendingEffects();
   };
   return [getter, setter];
 };
@@ -87,4 +92,19 @@ export const effect = (eff: () => void): (() => void) => {
   return () => {
     detached = true;
   };
+};
+
+/**
+ * Batch (transactional) update of multiple input signals
+ */
+export const batch = (b: () => void): void => {
+  batchLevel++;
+  try {
+    b();
+    if (batchLevel === 1)
+      //last level
+      runPendingEffects();
+  } finally {
+    batchLevel--;
+  }
 };

@@ -1,5 +1,5 @@
 import { it, describe, expect, vi } from "vitest";
-import { signal, calculated, effect } from "../signal";
+import { signal, calculated, effect, batch } from "../signal";
 
 describe("effects", () => {
   it("trigger effect", () => {
@@ -27,6 +27,18 @@ describe("effects", () => {
     expect(eff).toBeCalledTimes(1);
     setRoot(3);
     //to be called just once
+    expect(eff).toBeCalledTimes(2);
+  });
+
+  it("batch update", () => {
+    const [one, setOne] = signal(1);
+    const [two, setTwo] = signal(2);
+    const eff = vi.fn(() => console.log("effect", one() + two()));
+    effect(eff);
+    batch(() => {
+      setOne(6);
+      setTwo(6);
+    });
     expect(eff).toBeCalledTimes(2);
   });
 });
