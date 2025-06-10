@@ -3,6 +3,11 @@ const callstack: Observer[] = [];
 const pendingEffects = new Set<Observer>();
 let batchLevel = 0;
 
+/**
+ * Used to detect cyclic dependencies in a graph
+ */
+let isExecuting = false;
+
 const createObservable = () => {
   const dependents = new Set<Observer>();
   const addCallerAsDependent = () => {
@@ -35,6 +40,10 @@ export const signal = <T>(value: NonVoid<T>): [Getter<T>, Setter<T>] => {
     return value;
   };
   const setter = (newValue: NonVoid<T>) => {
+    if (isExecuting)
+      throw new Error(
+        "There is a cyclic dependencies in dependency graph.\nSome effect or calculated value calls a signal setter."
+      );
     value = newValue;
     observable.invalidateDependents();
     if (batchLevel === 0) runPendingEffects();
@@ -60,11 +69,13 @@ export const calculated = <T>(fn: () => NonVoid<T>): Getter<T> => {
 
     observable.addCallerAsDependent();
     callstack.push(invalidate);
+    isExecuting = true;
     try {
       const v = fn();
       value = { valid: true, value: v };
       return v;
     } finally {
+      isExecuting = false;
       callstack.pop();
     }
   };
@@ -82,9 +93,11 @@ export const effect = (eff: () => void): (() => void) => {
   const effect = () => {
     if (detached) return;
     callstack.push(invalidate);
+    isExecuting = true;
     try {
       eff();
     } finally {
+      isExecuting = false;
       callstack.pop();
     }
   };
