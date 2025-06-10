@@ -5,12 +5,15 @@
   "packageManager": "yarn@1.22.22",
   "scripts": {
     "dev": "yarn tsx src/index.ts",
-    "build": "tsc -b"
+    "build": "tsc -b",
+    "test": "vitest --run"
   },
   "devDependencies": {
     "@types/node": "^22.15.30",
+    "jsdom": "^26.1.0",
     "tsx": "^4.19.4",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.3"
   },
   "dependencies": {}
 }
