@@ -1,6 +1,7 @@
-type Observer = () => void;
-const callstack: Observer[] = [];
-const pendingEffects = new Set<Observer>();
+type Dependent = () => void;
+type Effect = () => void;
+const callstack: Dependent[] = [];
+const pendingEffects = new Set<Effect>();
 let batchLevel = 0;
 
 /**
@@ -9,7 +10,7 @@ let batchLevel = 0;
 let isExecuting = false;
 
 const createObservable = () => {
-  const dependents = new Set<Observer>();
+  const dependents = new Set<Dependent>();
   const addCallerAsDependent = () => {
     const caller = callstack.at(-1);
     if (caller) dependents.add(caller);
@@ -85,7 +86,7 @@ export const calculated = <T>(fn: () => NonVoid<T>): Getter<T> => {
 /**
  * @return detach function
  */
-export const effect = (eff: () => void): (() => void) => {
+export const effect = (eff: Effect): (() => void) => {
   let detached = false;
   const invalidate = () => {
     if (!detached) pendingEffects.add(effect);
