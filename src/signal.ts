@@ -9,19 +9,21 @@ let batchLevel = 0;
  */
 let isExecuting = false;
 
-const createObservable = () => {
+const createTrackableDependents = () => {
   const dependents = new Set<Dependent>();
   const addCallerAsDependent = () => {
     const caller = callstack.at(-1);
     if (caller) dependents.add(caller);
   };
-  const invalidateDependents = () => {
+  const invalidateAll = () => {
     dependents.forEach((d) => d());
     dependents.clear();
   };
+  const removeExecutingDependent = (d: Dependent) => dependents.delete(d);
   return {
     addCallerAsDependent,
-    invalidateDependents,
+    invalidateAll,
+    removeExecutingDependent,
   };
 };
 
@@ -35,9 +37,9 @@ export type Getter<T> = () => T;
 export type Setter<T> = (value: NonVoid<T>) => void;
 
 export const signal = <T>(value: NonVoid<T>): [Getter<T>, Setter<T>] => {
-  const observable = createObservable();
+  const dependents = createTrackableDependents();
   const getter = () => {
-    observable.addCallerAsDependent();
+    dependents.addCallerAsDependent();
     return value;
   };
   const setter = (newValue: NonVoid<T>) => {
@@ -46,7 +48,7 @@ export const signal = <T>(value: NonVoid<T>): [Getter<T>, Setter<T>] => {
         "There is a cyclic dependencies in dependency graph.\nSome effect or calculated value calls a signal setter."
       );
     value = newValue;
-    observable.invalidateDependents();
+    dependents.invalidateAll();
     if (batchLevel === 0) runPendingEffects();
   };
   return [getter, setter];
@@ -58,23 +60,23 @@ type CalculatedValue<T> = Invalidated | ValidValue<T>;
 const invalid: Invalidated = { valid: false };
 
 export const calculated = <T>(fn: () => NonVoid<T>): Getter<T> => {
-  let value: CalculatedValue<T> = invalid;
-  const observable = createObservable();
+  let memo: CalculatedValue<T> = invalid;
+  const observable = createTrackableDependents();
   const invalidate = () => {
-    value = invalid;
-    observable.invalidateDependents();
+    memo = invalid;
+    observable.invalidateAll();
   };
 
   const getter = (): T => {
     observable.addCallerAsDependent();
-    if (value.valid === true) return value.value;
+    if (memo.valid === true) return memo.value;
 
     callstack.push(invalidate);
     isExecuting = true;
     try {
-      const v = fn();
-      value = { valid: true, value: v };
-      return v;
+      const value = fn();
+      memo = { valid: true, value };
+      return value;
     } finally {
       isExecuting = false;
       callstack.pop();
