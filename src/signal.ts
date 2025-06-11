@@ -1,29 +1,55 @@
-type Dependent = {
+type Downstream = {
   invalidate: () => void;
+  dependsOn: (u: Upstream) => void;
 };
+type Upstream = {
+  detachFrom: (d: Downstream) => void;
+};
+
 type Effect = () => void;
-const callstack: Dependent[] = [];
+const callstack: Downstream[] = [];
 const pendingEffects = new Set<Effect>();
 let batchLevel = 0;
 
 //Used to detect cyclic dependencies in a graph
 let isExecuting = false;
 
-const createTrackableDependents = () => {
-  const dependents = new Set<Dependent>();
-  const addCallerAsDependent = () => {
-    const caller = callstack.at(-1);
-    if (caller) dependents.add(caller);
+const getCaller = () => callstack.at(-1);
+
+const createDependentsTracker = () => {
+  const dependents = new Set<Downstream>();
+  const upstream = {
+    detachFrom: (d: Downstream) => dependents.delete(d),
+  };
+  const addDependent = () => {
+    const caller = getCaller();
+    if (caller) {
+      dependents.add(caller);
+      caller.dependsOn(upstream);
+    }
   };
   const invalidateAll = () => {
     dependents.forEach((d) => d.invalidate());
     dependents.clear();
   };
-  const removeExecutingDependent = (d: Dependent) => dependents.delete(d);
   return {
-    addCallerAsDependent,
+    addDependent,
     invalidateAll,
-    removeExecutingDependent,
+  };
+};
+
+const createDependenciesTracker = () => {
+  const dependencies = new Set<Upstream>();
+
+  const dependsOn = (u: Upstream) => dependencies.add(u);
+  const detachFrom = (d: Downstream) => {
+    dependencies.forEach((u) => u.detachFrom(d));
+    dependencies.clear();
+  };
+
+  return {
+    dependsOn,
+    detachFrom,
   };
 };
 
@@ -37,9 +63,9 @@ export type Getter<T> = () => T;
 export type Setter<T> = (value: NonVoid<T>) => void;
 
 export const signal = <T>(value: NonVoid<T>): [Getter<T>, Setter<T>] => {
-  const dependents = createTrackableDependents();
+  const dependents = createDependentsTracker();
   const getter = () => {
-    dependents.addCallerAsDependent();
+    dependents.addDependent();
     return value;
   };
   const setter = (newValue: NonVoid<T>) => {
@@ -49,6 +75,7 @@ export const signal = <T>(value: NonVoid<T>): [Getter<T>, Setter<T>] => {
       );
     value = newValue;
     dependents.invalidateAll();
+    //TODO: detach dependencies
     if (batchLevel === 0) runPendingEffects();
   };
   return [getter, setter];
@@ -61,17 +88,20 @@ const invalid: Invalidated = { valid: false };
 
 export const calculated = <T>(fn: () => NonVoid<T>): Getter<T> => {
   let memo: CalculatedValue<T> = invalid;
-  const observable = createTrackableDependents();
+  const dependents = createDependentsTracker();
+  const dependencies = createDependenciesTracker();
 
-  const thisNode: Dependent = {
+  const thisNode: Downstream = {
     invalidate: () => {
       memo = invalid;
-      observable.invalidateAll();
+      dependents.invalidateAll();
+      dependencies.detachFrom(thisNode);
     },
+    dependsOn: (u: Upstream) => dependencies.dependsOn(u),
   };
 
   const getter = (): T => {
-    observable.addCallerAsDependent();
+    dependents.addDependent();
     if (memo.valid === true) return memo.value;
 
     callstack.push(thisNode);
@@ -92,15 +122,14 @@ export const calculated = <T>(fn: () => NonVoid<T>): Getter<T> => {
  * @return detach function
  */
 export const effect = (eff: Effect): (() => void) => {
-  let detached = false;
+  const dependencies = createDependenciesTracker();
 
-  const thisNode: Dependent = {
-    invalidate: () => {
-      if (!detached) pendingEffects.add(effect);
-    },
+  const thisNode: Downstream = {
+    invalidate: () => pendingEffects.add(effect),
+    dependsOn: (u: Upstream) => dependencies.dependsOn(u),
   };
   const effect = () => {
-    if (detached) return;
+    dependencies.detachFrom(thisNode);
     callstack.push(thisNode);
     isExecuting = true;
     try {
@@ -113,7 +142,7 @@ export const effect = (eff: Effect): (() => void) => {
   //run effect first time to collect dependencies to track
   effect();
   return () => {
-    detached = true;
+    dependencies.detachFrom(thisNode);
   };
 };
 

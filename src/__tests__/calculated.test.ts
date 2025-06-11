@@ -76,14 +76,14 @@ describe("calculated values", () => {
     expect(fn).toBeCalledTimes(2);
     setOne(10);
     expect(calc()).toEqual(3);
-    expect(fn).toBeCalledTimes(3); //lingering dependency one one
+    expect(fn).toBeCalledTimes(2); //not called
     setOne(100);
     calc();
-    expect(fn).toBeCalledTimes(3); //no more lingering dependency on one
+    expect(fn).toBeCalledTimes(2); //not called
 
     setTwo(33);
     expect(calc()).toEqual(33);
-    expect(fn).toBeCalledTimes(4);
+    expect(fn).toBeCalledTimes(3); //called again
   });
 
   it("track dependency on cached calculated", () => {
