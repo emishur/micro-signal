@@ -1,12 +1,12 @@
-type Dependent = () => void;
+type Dependent = {
+  invalidate: () => void;
+};
 type Effect = () => void;
 const callstack: Dependent[] = [];
 const pendingEffects = new Set<Effect>();
 let batchLevel = 0;
 
-/**
- * Used to detect cyclic dependencies in a graph
- */
+//Used to detect cyclic dependencies in a graph
 let isExecuting = false;
 
 const createTrackableDependents = () => {
@@ -16,7 +16,7 @@ const createTrackableDependents = () => {
     if (caller) dependents.add(caller);
   };
   const invalidateAll = () => {
-    dependents.forEach((d) => d());
+    dependents.forEach((d) => d.invalidate());
     dependents.clear();
   };
   const removeExecutingDependent = (d: Dependent) => dependents.delete(d);
@@ -62,16 +62,19 @@ const invalid: Invalidated = { valid: false };
 export const calculated = <T>(fn: () => NonVoid<T>): Getter<T> => {
   let memo: CalculatedValue<T> = invalid;
   const observable = createTrackableDependents();
-  const invalidate = () => {
-    memo = invalid;
-    observable.invalidateAll();
+
+  const thisNode: Dependent = {
+    invalidate: () => {
+      memo = invalid;
+      observable.invalidateAll();
+    },
   };
 
   const getter = (): T => {
     observable.addCallerAsDependent();
     if (memo.valid === true) return memo.value;
 
-    callstack.push(invalidate);
+    callstack.push(thisNode);
     isExecuting = true;
     try {
       const value = fn();
@@ -90,12 +93,15 @@ export const calculated = <T>(fn: () => NonVoid<T>): Getter<T> => {
  */
 export const effect = (eff: Effect): (() => void) => {
   let detached = false;
-  const invalidate = () => {
-    if (!detached) pendingEffects.add(effect);
+
+  const thisNode: Dependent = {
+    invalidate: () => {
+      if (!detached) pendingEffects.add(effect);
+    },
   };
   const effect = () => {
     if (detached) return;
-    callstack.push(invalidate);
+    callstack.push(thisNode);
     isExecuting = true;
     try {
       eff();
