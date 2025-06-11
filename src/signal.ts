@@ -14,15 +14,13 @@ let batchLevel = 0;
 //Used to detect cyclic dependencies in a graph
 let isExecuting = false;
 
-const getCaller = () => callstack.at(-1);
-
 const createDependentsTracker = () => {
   const dependents = new Set<Downstream>();
   const upstream = {
     detachFrom: (d: Downstream) => dependents.delete(d),
   };
   const addDependent = () => {
-    const caller = getCaller();
+    const caller = callstack.at(-1);
     if (caller) {
       dependents.add(caller);
       caller.dependsOn(upstream);
