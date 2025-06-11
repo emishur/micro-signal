@@ -85,4 +85,16 @@ describe("calculated values", () => {
     expect(calc()).toEqual(33);
     expect(fn).toBeCalledTimes(4);
   });
+
+  it("track dependency on cached calculated", () => {
+    const [one, setOne] = signal(1);
+    const incremented = calculated(() => one() + 1);
+    const doubled = calculated(() => incremented() * 2);
+
+    //now incremented cached the value
+    expect(incremented()).toEqual(2);
+    expect(doubled()).toEqual(4);
+    setOne(10);
+    expect(doubled()).toEqual(22);
+  });
 });

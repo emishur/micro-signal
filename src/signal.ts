@@ -65,9 +65,9 @@ export const calculated = <T>(fn: () => NonVoid<T>): Getter<T> => {
   };
 
   const getter = (): T => {
+    observable.addCallerAsDependent();
     if (value.valid === true) return value.value;
 
-    observable.addCallerAsDependent();
     callstack.push(invalidate);
     isExecuting = true;
     try {
