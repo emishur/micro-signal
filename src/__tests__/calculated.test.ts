@@ -61,12 +61,28 @@ describe("calculated values", () => {
   });
   it("branching", () => {
     const [condition, setCondition] = signal(true);
-    const [one] = signal(1);
-    const [two] = signal(2);
-    const calc = calculated(() => (condition() ? one() : two()));
+    const [one, setOne] = signal(1);
+    const [two, setTwo] = signal(2);
+    const fn = vi.fn(() => (condition() ? one() : two()));
+    const calc = calculated(fn);
 
     expect(calc()).toEqual(1);
+    setTwo(3);
+    expect(calc()).toEqual(1);
+    expect(fn).toBeCalledTimes(1);
+
     setCondition(false);
-    expect(calc()).toEqual(2);
+    expect(calc()).toEqual(3);
+    expect(fn).toBeCalledTimes(2);
+    setOne(10);
+    expect(calc()).toEqual(3);
+    expect(fn).toBeCalledTimes(3); //lingering dependency one one
+    setOne(100);
+    calc();
+    expect(fn).toBeCalledTimes(3); //no more lingering dependency on one
+
+    setTwo(33);
+    expect(calc()).toEqual(33);
+    expect(fn).toBeCalledTimes(4);
   });
 });
