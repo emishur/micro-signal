@@ -30,7 +30,7 @@ const runPendingEffects = () => {
 };
 
 export type NonVoid<T> = T extends void ? never : T;
-export type Getter<T> = () => NonVoid<T>;
+export type Getter<T> = () => T;
 export type Setter<T> = (value: NonVoid<T>) => void;
 
 export const signal = <T>(value: NonVoid<T>): [Getter<T>, Setter<T>] => {
@@ -52,7 +52,7 @@ export const signal = <T>(value: NonVoid<T>): [Getter<T>, Setter<T>] => {
 };
 
 type Invalidated = { valid: false };
-type ValidValue<T> = { valid: true; value: NonVoid<T> };
+type ValidValue<T> = { valid: true; value: T };
 type CalculatedValue<T> = Invalidated | ValidValue<T>;
 const invalid: Invalidated = { valid: false };
 
@@ -64,7 +64,7 @@ export const calculated = <T>(fn: () => NonVoid<T>): Getter<T> => {
     observable.invalidateDependents();
   };
 
-  const getter = (): NonVoid<T> => {
+  const getter = (): T => {
     if (value.valid === true) return value.value;
 
     observable.addCallerAsDependent();
@@ -101,6 +101,7 @@ export const effect = (eff: () => void): (() => void) => {
       callstack.pop();
     }
   };
+  //run effect first time to collect dependencies to track
   effect();
   return () => {
     detached = true;
