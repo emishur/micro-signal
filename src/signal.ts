@@ -56,17 +56,18 @@ const runPendingEffects = () => {
   pendingEffects.clear();
 };
 
-export type NonVoid<T> = T extends void ? never : T;
+export type ReturnNonVoid<F extends (...args: any) => any> =
+  ReturnType<F> extends void ? never : F;
 export type Getter<T> = () => T;
-export type Setter<T> = (value: NonVoid<T>) => void;
+export type Setter<T> = (value: T) => void;
 
-export const signal = <T>(value: NonVoid<T>): [Getter<T>, Setter<T>] => {
+export const signal = <T>(value: T): [Getter<T>, Setter<T>] => {
   const dependents = createDependentsTracker();
   const getter = () => {
     dependents.addDependent();
     return value;
   };
-  const setter = (newValue: NonVoid<T>) => {
+  const setter = (newValue: T) => {
     if (isExecuting)
       throw new Error(
         "There is a cyclic dependencies in dependency graph.\nSome effect or calculated value calls a signal setter."
@@ -84,7 +85,7 @@ type ValidValue<T> = { valid: true; value: T };
 type CalculatedValue<T> = Invalidated | ValidValue<T>;
 const invalid: Invalidated = { valid: false };
 
-export const calculated = <T>(fn: () => NonVoid<T>): Getter<T> => {
+export const calculated = <T>(fn: ReturnNonVoid<() => T>): Getter<T> => {
   let memo: CalculatedValue<T> = invalid;
   const dependents = createDependentsTracker();
   const dependencies = createDependenciesTracker();
